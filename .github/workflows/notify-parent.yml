@@ -1,3 +1,4 @@
+
 name: Notify Parent Repo of Updates
 
 on:
@@ -5,25 +6,45 @@ on:
     branches:
       - main  # or your default branch
 
-permissions:
-  contents: read
-
 jobs:
   notify-parent:
     runs-on: ubuntu-latest
     steps:
       - name: Notify parent repository
+        env:
+          PARENT_REPO_TOKEN: ${{ secrets.PARENT_REPO_TOKEN }}
+          PARENT_REPO: "rr4323/data_scientist_mastry"  # Replace with actual values
         run: |
-          curl -X POST \
+          if [ -z "$PARENT_REPO_TOKEN" ]; then
+            echo "Error: PARENT_REPO_TOKEN secret is not set"
+            echo "Please create a Personal Access Token with 'repo' permissions and add it as a secret"
+            exit 1
+          fi
+          
+          echo "Notifying parent repository: $PARENT_REPO"
+          
+          response=$(curl -s -w "%{http_code}" -X POST \
             -H "Accept: application/vnd.github.v3+json" \
-            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
-            https://api.github.com/repos/rr4323/data_scientist_mastry/dispatches \
+            -H "Authorization: token $PARENT_REPO_TOKEN" \
+            -H "User-Agent: GitHub-Actions" \
+            https://api.github.com/repos/$PARENT_REPO/dispatches \
             -d '{
               "event_type": "submodule-updated",
               "client_payload": {
                 "submodule": "${{ github.repository }}",
                 "commit": "${{ github.sha }}",
                 "ref": "${{ github.ref }}",
-                "timestamp": "${{ github.event.head_commit.timestamp }}"
+                "timestamp": "${{ github.event.head_commit.timestamp }}",
+                "pusher": "${{ github.event.pusher.name }}"
               }
-            }'
+            }')
+          
+          http_code="${response: -3}"
+          
+          if [ "$http_code" = "204" ]; then
+            echo "✅ Successfully notified parent repository"
+          else
+            echo "❌ Failed to notify parent repository. HTTP status: $http_code"
+            echo "Response: ${response%???}"
+            exit 1
+          fi
