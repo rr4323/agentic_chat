@@ -1,0 +1,29 @@
+name: Notify Parent Repo of Updates
+
+on:
+  push:
+    branches:
+      - main  # or your default branch
+
+permissions:
+  contents: read
+
+jobs:
+  notify-parent:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Notify parent repository
+        run: |
+          curl -X POST \
+            -H "Accept: application/vnd.github.v3+json" \
+            -H "Authorization: token ${{ secrets.PARENT_REPO_TOKEN }}" \
+            https://api.github.com/repos/rr4323/data_scientist_mastry/dispatches \
+            -d '{
+              "event_type": "submodule-updated",
+              "client_payload": {
+                "submodule": "${{ github.repository }}",
+                "commit": "${{ github.sha }}",
+                "ref": "${{ github.ref }}",
+                "timestamp": "${{ github.event.head_commit.timestamp }}"
+              }
+            }'
